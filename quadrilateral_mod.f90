@@ -15,70 +15,71 @@ module quadrilateral_mod
   real(DP), parameter :: x1 = - 1.0_DP / sqrt(3.0), x2 = 1.0_DP / sqrt(3.0)
   real(DP), parameter :: w1 = 1.0_DP, w2 = 1.0_DP
 
-  abstract interface 
-    real(DP) function funct(p) result(res)
-      import :: Point, DP
-      type(Point) :: p
-    end function funct
-
+  
+  type, public :: Square
+  type(Point) :: a(4)
+  integer     :: aI(4)
+  real(DP) :: jacobDetInGaussPoint(2,2)
+  
+  ! Coefficients of the equations that come from this element
+  ! i,j index means that it is integrated over the i,j basis functions
+  real(DP) :: K(4,4)
+  real(DP) :: b(4)
+  contains
+  
+  procedure :: integral
+  procedure :: integralBig
+  procedure :: refToMain 
+  procedure :: jacobDet
+  procedure :: nodesIndex
+  procedure :: set_K
+  ! procedure :: area => area_quadrilateral
+  ! procedure :: basis
+  end type
+  
+  interface Square
+  procedure :: newSquare
   end interface
-
+  
+  
   abstract interface 
-    real(DP) function functBig(p, parametr, basis1, basis2) result(res)
-      import :: Point, Param, DP
+  real(DP) function funct(p) result(res)
+  import :: Point, DP
+  type(Point) :: p
+end function funct
+
+end interface
+
+abstract interface 
+real(DP) function functBig(s, p, parametr, basis1, basis2) result(res)
+import :: Point, Square, Param, DP
+      type(Square) :: s
       type(Point) :: p
       type(Param) :: parametr
       integer     :: basis1, basis2
     end function functBig
-
-  end interface
-
-  type, public :: Square
-    type(Point) :: a(4)
-    integer     :: aI(4)
-    real(DP) :: jacobDetInGaussPoint(2,2)
-
-    ! Coefficients of the equations that come from this element
-    ! i,j index means that it is integrated over the i,j basis functions
-    real(DP) :: K(4,4)
-    real(DP) :: b(4)
+end interface
     contains
-
-    procedure :: integral
-    procedure :: integralBig
-    procedure :: refToMain 
-    procedure :: jacobDet
-    procedure :: nodesIndex
-    procedure :: set_K
-    ! procedure :: area => area_quadrilateral
-    ! procedure :: basis
-  end type
-
-  interface Square
-    procedure :: newSquare
-  end interface
-
-  contains
-
-  real(DP) function integral(self, f) result(res)
+    
+    real(DP) function integral(self, f) result(res)
     class(square) :: self
     procedure(funct) :: f
     res = f(Point(x1,x1)) * w1 * w1 * self%jacobDetInGaussPoint(1,1) + &
-          f(Point(x1,x2)) * w1 * w2 * self%jacobDetInGaussPoint(1,2) + &
-          f(Point(x2,x1)) * w2 * w1 * self%jacobDetInGaussPoint(2,1) + &
-          f(Point(x2,x2)) * w2 * w2 * self%jacobDetInGaussPoint(2,2) 
+    f(Point(x1,x2)) * w1 * w2 * self%jacobDetInGaussPoint(1,2) + &
+    f(Point(x2,x1)) * w2 * w1 * self%jacobDetInGaussPoint(2,1) + &
+    f(Point(x2,x2)) * w2 * w2 * self%jacobDetInGaussPoint(2,2) 
   end function integral
-
+  
   real(DP) function integralBig(self, f, parametr, k, l) result(res)
-    class(square)       :: self
-    procedure(functBig) :: f
-    type(Param)         :: parametr
-    integer             :: k, l
-    res = f(Point(x1,x1), parametr, k ,l) * w1 * w1 * self%jacobDetInGaussPoint(1,1) + &
-          f(Point(x1,x2), parametr, k ,l) * w1 * w2 * self%jacobDetInGaussPoint(1,2) + &
-          f(Point(x2,x1), parametr, k ,l) * w2 * w1 * self%jacobDetInGaussPoint(2,1) + &
-          f(Point(x2,x2), parametr, k ,l) * w2 * w2 * self%jacobDetInGaussPoint(2,2)  
-  end function integralBig
+  class(square)       :: self
+  procedure(functBig) :: f
+  type(Param)         :: parametr
+  integer             :: k, l
+  res = f(self, Point(x1,x1), parametr, k ,l) * w1 * w1 * self%jacobDetInGaussPoint(1,1) + &
+        f(self, Point(x1,x2), parametr, k ,l) * w1 * w2 * self%jacobDetInGaussPoint(1,2) + &
+        f(self, Point(x2,x1), parametr, k ,l) * w2 * w1 * self%jacobDetInGaussPoint(2,1) + &
+        f(self, Point(x2,x2), parametr, k ,l) * w2 * w2 * self%jacobDetInGaussPoint(2,2)  
+end function integralBig
 
   type(Square) function newSquare(a1, a2, a3, a4)
     type(Point) :: a1, a2, a3, a4
@@ -225,11 +226,13 @@ module quadrilateral_mod
 
   end subroutine set_K
 
-  real(DP) function val(p, parametr, k, l) result(res)
+  real(DP) function val(s, p, parametr, k, l) result(res)
+    type(Square) :: s  
     type(Point) :: p
     type(Param) :: parametr 
     integer     :: k, l
 
+    type(Point) :: ph
     real(DP) :: x, y
     real(DP) :: xMin, xMax, m
     real(DP) :: yMin, yMax, a
@@ -241,11 +244,12 @@ module quadrilateral_mod
     yMax = parametr%yMax
     a    = parametr%a
     
-    x = p%x 
-    y = p%y 
-    res = m * u(m, y, yMin, yMax) * basisF(l,p) * DX_basisF(k,p) - &
+    ph = s%refToMain(p)
+    x = ph%x
+    y = ph%y
+    res = &!m * u(m, y, yMin, yMax) * basisF(l,p) * DX_basisF(k,p) - &
               DX_basisF(l,p) * DX_basisF(k,p)                    + &
-          m * v(m, y, yMin, yMax) * basisF(l,p) * DY_basisF(k,p) - &
+          !m * v(m, y, yMin, yMax) * basisF(l,p) * DY_basisF(k,p) - &
           a * DY_basisF(l,p) * DY_basisF(k,p)
   end function val
 
@@ -255,25 +259,27 @@ module quadrilateral_mod
     res = 6.0_DP * m * (yMax - y) * (y - yMin)
   end function u
 
-  real(DP) function v(m, x, xMin, xMax) result(res)
-    real(DP) :: x, xMin, xMax, m 
+  real(DP) function v(m, x, yMin, yMax) result(res)
+    real(DP) :: x, yMin, yMax, m 
 
     res = 0.0_DP
   end function v
 
-  real(DP) function bval(p, parametr, k, l) result(res)
+  real(DP) function bval(s, p, parametr, k, l) result(res)
+    type(Square) :: s  
     type(Point) :: p
+    type(Point) :: ph
     type(Param) :: parametr 
     integer     :: k, l
 
-    res = parametr%q * 0.1_DP * exp(-sqrt((p%x+10.0_DP)**2 + 10.0_DP *(p%y-0.5_DP)**2)) *&
-    basisF(k, p)
+    ph = s%refToMain(p)
+    res = parametr%q * 0.1_DP * exp(-sqrt((ph%x+10.0_DP)**2 + &
+     100.0_DP *(ph%y-0.5_DP)**2)) * basisF(k, p)
   end function bval
   
   subroutine nodesIndex(self, node1, node2, node3, node4) 
     class(Square), intent(inout) :: self
     integer      , intent(in   ) :: node1, node2, node3, node4
-    integer :: i 
 
     self%aI(1) = node1
     self%aI(2) = node2

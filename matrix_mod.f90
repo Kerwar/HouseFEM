@@ -2,7 +2,9 @@ module matrix_mod
 
   use number_types_mod , only: DP
   use point_mod        , only: Point
-  use blas_sparse, only: duscr_begin, duscr_insert_entry , usds, uscr_end, dusmv, blas_upper_triangular, ussp, ussv
+  use blas_sparse, only: duscr_begin, duscr_insert_entry , usds, uscr_end, &
+  dusmv, blas_upper_triangular, ussp, ussv, duscr_insert_row
+  !use blas, only: dtrsv
   !lapack, only: dgvem 
 
   implicit none
@@ -21,7 +23,7 @@ module matrix_mod
 
     integer :: ABlas, istat
     res = x0
-    do j = 1, m_it/5000
+    do j = 1, 1
       H = 0.0_DP
       cs = 0.0_DP
       sn = 0.0_DP 
@@ -40,7 +42,7 @@ module matrix_mod
 
       call cpu_time(ts)
       print *, "lap ready"
-      do k = 1, 5000
+      do k = 1, m_it
 
         call Arnoldi(ABLAS, Q(:, 1:k+1), k, H(:,k))
 
@@ -57,16 +59,18 @@ module matrix_mod
         if (error < tol) exit
       end do 
 
-      k = min(k, 5000)
+      k = min(k, m_it)
       y(1:k) = HeissenbergSolver(H(1:k,1:k), beta(1:k))
-
+      print *, k, error, int(te)/3600, ":", mod(int(te),3600)/60, ":", mod(int(te),60)
+      open(501, file = "res.sol")
       do i = 1, n
         res(i) = res(i) + dot_product(Q(i, 1:k), y(1:k))
-      end do       
-      if (error < tol) exit
-      print *, j, "lap" 
+        write(501,*) res(i)
+      end do    
+      close(501)
     end do
     print *, error, k, n
+
     call usds(ABlas, istat)
   end function GMRES
 
@@ -131,37 +135,29 @@ module matrix_mod
     n = size(b)
     A = H
     s = b
-    
-    !do i = 1, n-1
-    !  c = A(i+1,i)/A(i,i)
-    !  A(i+1, i+1:n) = A(i+1, i+1:n) - c * A(i, i+1:n)  
-    !  s(i+1) = s(i+1) - c * s(i)
-    !end do
-
-    ! call duscr_begin(n, n, BBLAS,istat)
-    ! print *, "aa"
-    ! do i = 1,n 
-    !   do j = i,n
-    !     call duscr_insert_entry(BBLAS,A(i,j),i,j,istat)
-    !   end do
-    !   print *, i
+    ! do i = 1, n-1
+    !   c = A(i+1,i)/A(i,i)
+    !   A(i+1, i+1:n) = A(i+1, i+1:n) - c * A(i, i+1:n)  
+    !   s(i+1) = s(i+1) - c * s(i)
     ! end do
-    ! print *, "aaaa"
-    ! call ussp(BBLAS,blas_upper_triangular,istat)
-    ! print *, "aaaaa"
-    ! call uscr_end(BBLAS,istat )
-    ! print *, "ab"
-    ! call usSV(BBLAS,s, istat)
-    ! print *, "avv"
+    call dtrsv("U", "N", "N", n, A, n, s, 1)
+    !call duscr_begin(n, n, BBLAS,istat)
+    !call ussp(BBLAS,blas_upper_triangular,istat)
+    !do i = 1,n 
+    !    call duscr_insert_row(BBLAS,i,A(i,i:n),[(j, j = i,n)],istat)
+    !  if (mod(i,100)== 0) print *, i, n
+    !end do
+    !call uscr_end(BBLAS,istat )
+    !call usSV(BBLAS,s, istat)
     ! call tbsv()
     ! call dgtrsm("L", "U", "N", "N", size(b), 1, 1.0, A, size(b), s, size(b))
-    !res = s 
-    res(n) = s(n) / A(n,n)
+    res = s 
+    ! res(n) = s(n) / A(n,n)
 
-    ! call usds(BBLAS, istat)
-    do i = n-1, 1, -1
-     res(i) = (s(i) - dot_product(res(i+1:n), A(i,i+1:n))) / A(i,i)
-    end do
+    !call usds(BBLAS, istat)
+    ! do i = n-1, 1, -1
+    !  res(i) = (s(i) - dot_product(res(i+1:n), A(i,i+1:n))) / A(i,i)
+    ! end do
   end function HeissenbergSolver
 
   subroutine swapColumns(A, b, j1, j2)
@@ -174,6 +170,12 @@ module matrix_mod
 
     A(:, j1) = c2
     A(:, j2) = c1
+
+    c1 = A(j1, :)
+    c2 = A(j2, :)
+    
+    A(j1, :) = c2
+    A(j2, :) = c1
 
     do i = 1, size(b)
       b(i) = b(i) ! - BC value

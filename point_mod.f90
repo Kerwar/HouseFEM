@@ -33,7 +33,7 @@ module point_mod
     type(Point), intent(inout) :: n1, n2
     type(Point) :: h 
 
-    n1 = h 
+    h = n1 
     n1 = n2 
     n2 = h
   end subroutine swapNodes
