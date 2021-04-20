@@ -26,7 +26,7 @@ module point_mod
     integer :: n
     integer :: m
 
-    res = (n-1) * 121 + m
+    res = (n-1) * 100 + m
   end function idx
 
   subroutine swapNodes(n1, n2)

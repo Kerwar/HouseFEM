@@ -2,8 +2,8 @@
 FC = gfortran
 
 # compile flags
-#FCFLAGS = -c -g -fbacktrace -fbackslash -fno-align-commons -fbounds-check -std=legacy -I./SOFTWARE
-FCFLAGS = -c -O2 -fbackslash -fno-align-commons -I./SOFTWARE
+FCFLAGS = -c -g -fbacktrace -fbackslash -fno-align-commons -fbounds-check -std=legacy -I./SOFTWARE
+#FCFLAGS = -c -O2 -fbackslash -fno-align-commons -I./SOFTWARE
 # link flags
 FLFLAGS =-llapack -lblas -L .-lrefblas -L ./SOFTWARE -lSparseBLAS_GNU #/home/javi/.local/lapack/libblas.a /home/javi/.local/lapack/liblapack.a
 # FLFLAGS =  -Wl,--start-group /opt/intel/oneapi/mkl/2021.2.0/lib/intel64/libmkl_gf_lp64.a /opt/intel/oneapi/mkl/2021.2.0/lib/intel64/libmkl_sequential.a /opt/intel/oneapi/mkl/2021.2.0/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm -ldl#-I${F95ROOT}/include/intel64/ilp64 -fdefault-integer-8  -m64  -I"${MKLROOT}/include"#-I/usr/lib/x86_64-linux-gnu/lapack -lblas -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu -llapack
@@ -18,6 +18,7 @@ point_mod.o \
 quadrilateral_mod.o \
 matrix_mod.o \
 out_mod.o \
+test_unit.o \
 fem.o
 
 # program name

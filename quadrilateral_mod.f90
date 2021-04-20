@@ -247,10 +247,11 @@ end function integralBig
     ph = s%refToMain(p)
     x = ph%x
     y = ph%y
-    res = &!m * u(m, y, yMin, yMax) * basisF(l,p) * DX_basisF(k,p) - &
+    res =& !m * u(m, y, yMin, yMax) * basisF(l,p) * DX_basisF(k,p) + &!- &
               DX_basisF(l,p) * DX_basisF(k,p)                    + &
-          !m * v(m, y, yMin, yMax) * basisF(l,p) * DY_basisF(k,p) - &
+          !+m * v(m, y, yMin, yMax) * basisF(l,p) * DY_basisF(k,p)! - &
           a * DY_basisF(l,p) * DY_basisF(k,p)
+          res = -res
   end function val
 
   real(DP) function u(m, y, yMin, yMax) result(res)

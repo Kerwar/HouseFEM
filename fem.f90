@@ -8,7 +8,7 @@ program FEM
   use progress_mod
   use out_mod          , only: write_nodes
   use blas_sparse, only: duscr_begin, duscr_insert_entry , usds, uscr_end, dusmv, blas_upper_triangular, ussp, ussv 
-
+  use test_unit
   implicit none
 
 ! DIRICHLET BOUNDARY CONDITIONS RANT, READ IF IN NEED TO UNDERSTAND
@@ -31,38 +31,17 @@ program FEM
   type(gpf) :: gp 
   real(DP), allocatable :: xgrid(:), ygrid(:)
   real(DP), allocatable :: x(:,:), y(:,:), z(:,:)
-  real(DP), allocatable :: A(:,:), b(:), AA(:)
+  real(DP), allocatable :: A(:,:), b(:)!, AA(:)
   real(DP), allocatable :: x0(:), sol(:)
-  integer , allocatable :: JA(:), IA(:), IDBC(:)
+  integer , allocatable :: IDBC(:)!, JA(:), IA(:)
   integer :: ABlas, istat
 
-  real(DP) :: help, tStart, tEnd, xxx(4), aaaaa(4,4)
+  real(DP) :: help, tStart, tEnd
   integer :: nEl, nN, nDBC
   integer :: i, j, k, l 
-
+  character(len=*), parameter :: showTimer = "(A20, I3, A1, I3, A1, I3)"
   call cpu_time(tStart) 
 
-  ! CHUNK OF CODE FOR TEST GMRES IF NEEDED
-  ! xxx= 0.0_DP
-  ! call duscr_begin(4, 4, ABlas, istat)
-  ! do i = 1, 4
-  !   do j = 1, 4
-  !       aaaaa(i,j) = 2.0_DP*i-3.0_DP*j+1.0_DP*i*j
-  !       if (mod(i+j,3)==0) aaaaa(i,j) = -1.0_Dp
-  !       call duscr_insert_entry(ABlas, aaaaa(i,j), i, j, istat)
-  !   end do
-  ! end do
-  ! do i = 1,4
-  !   print *, aaaaa(i,:)
-  ! end do
-  ! call  progress_bar(i, nN-nDBC)
-  ! call uscr_end(ABlas, istat)
-  ! xxx = GMRES(ABlas, (/1.0_DP,3.0_DP,4.0_DP,-1.0_DP/), xxx, (10.0_dp)**(-10), 4, 4)
-  ! Solution
-  !   0.31746031746031772     
-  !   1.0910973084886129     
-  !  0.47204968944099379     
-  ! -0.66321601104209804  
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! PARAMETER SET UP AND GRID SET UP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -92,10 +71,9 @@ program FEM
       end if 
     end do
   end do
-  print *, IDBC
   call cpu_time(tEnd)
   call write_nodes(x, y)
-  print *, "Nodes node", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+  print showTimer, "Nodes node", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! ELEMENTS SET UP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -107,14 +85,18 @@ program FEM
       nEl = nEl + 1
       elements(nEl) = Square(nodes(idx(i,j)), nodes(idx(i,j+1)), &
       nodes(idx(i+1,j+1)), nodes(idx(i+1,j)))  
-      call elements(nEl)%nodesIndex(idx(i,j), idx(i+1,j), &
-      idx(i+1,j+1), idx(i,j+1))
+      call elements(nEl)%nodesIndex(idx(i,j), idx(i,j+1), &
+      idx(i+1,j+1), idx(i+1,j))
       call elements(nEL)%set_K(parametr)
     end do
   end do
   call cpu_time(tEnd)
-  print *, "Elements done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+  print showTimer, "Elements done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
 
+  
+  call test_GMRES()
+  call test_Integral(parametr)
+  call test_PointOrder(elements(:))
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! MATRIX SET UP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -151,8 +133,13 @@ program FEM
   end do
   
   call cpu_time(tEnd)
-  print *, "Matrix done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
-
+  print showTimer, "Matrix done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+   
+  ! open(801, file = "prematrix")
+  !  do i = 1, nN
+  !    write(801, "(19F6.2)") A(i,:), b(i), nodes(i)%x, nodes(i)%y
+  !  end do
+  !  close(801)
   l = nN
   do k = 1, nDBC 
     call swapColumns(A, b, iDBC(k), l)
@@ -167,18 +154,14 @@ program FEM
     l = l - 1
   end do 
 
-   open(801, file = "prematrix")
-   do i = 1, nN
-     write(801, *) A(i,1), A(i,nN), b(i)
-   end do
-   close(801)
+
   ! open(901, file = "postmatrix")
   ! do i = 1, nN
   !   write(901, *) A(i,1), A(i,nN)
   ! end do
   ! close(901)
   call cpu_time(tEnd)
-  print *, "BC applied", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+  print showTimer, "BC applied", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
   
   open(601, file = "order.sol")
   do i = 1, size(x,1)
@@ -199,7 +182,7 @@ close(601)
     end do
       if (mod(nN-nDBC,i)==1000) call progress_bar(i, nN-nDBC)
   end do
-  call  progress_bar(i, nN-nDBC)
+  call progress_bar(i, nN-nDBC)
   call uscr_end(ABlas, istat)
 
   !   k = 1
@@ -225,9 +208,9 @@ close(601)
   ! end do
   !IA(nN -nDBC +1) = k
   call cpu_time(tEnd)
-  print *, "Everything ready", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+  print showTimer, "Everything ready", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
   sol = 0.0_DP
-  sol(1:nN-nDBC) = GMRES(ABlas, b(1:NN-nDBC), x0(1:nN-nDBC), (10.0_dp)**(-5), nN-nDBC, 2*nN)
+  sol(1:nN-nDBC) = GMRES(ABlas, b(1:NN-nDBC), x0(1:nN-nDBC), (10.0_dp)**(-5), nN-nDBC, nN)
   
 
   l = nN
@@ -248,7 +231,7 @@ close(601)
   end do
   close(701)
   call cpu_time(tEnd)
-  print *, "Everything done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
+  print showTimer, "Everything done", int(tEnd)/3600, ":", mod(int(tEnd),3600)/60, ":", mod(int(tEnd),60)
   call gp%title("Temperature in a channel")
   call gp%xlabel("x Position")
   call gp%ylabel("y Position")

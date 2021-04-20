@@ -50,7 +50,12 @@ module progress_mod
     end if
     write(6,'(a)',advance='no') '] '
     write(6,'(I3.1)',advance='no') step
-    write(6,'(a)',advance='no') '%'
+    if (done == 100) then
+        write(6,'(a)',advance='yes') '%'
+    else 
+        write(6,'(a)',advance='no') '%'
+    end if
+
   end subroutine progress_bar
 
 
